@@ -1,0 +1,16 @@
+import os
+from milvus import *
+
+MILVUS_HOST = os.getenv("MILVUS_HOST", "127.0.0.1")
+MILVUS_PORT = os.getenv("MILVUS_PORT", 19530)
+VECTOR_DIMENSION = os.getenv("VECTOR_DIMENSION", 768)
+METRIC_TYPE = os.getenv("METRIC_TYPE", MetricType.L2)
+TOP_K = os.getenv("TOP_K", 7)
+L2_DISTANCE_THRESHOLD = os.getenv("L2_DISTANCE_THRESHOLD", 7)
+
+MILVUS_COLLECTION = os.getenv("MILVUS_COLLECTION", "ideas")
+
+FIRESTORE_IDEAS_COLLECTION = os.getenv("FIRESTORE_IDEAS_COLLECTION", "ideas")
+FIRESTORE_EMBEDDINGS_COLLECTION = os.getenv(
+    "FIRESTORE_EMBEDDINGS_COLLECTION", "embeddings"
+)
