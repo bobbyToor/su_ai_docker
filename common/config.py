@@ -1,5 +1,8 @@
 import os
-from milvus import *
+from milvus import MetricType
+
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 
 MILVUS_HOST = os.getenv("MILVUS_HOST", "127.0.0.1")
 MILVUS_PORT = os.getenv("MILVUS_PORT", 19530)
@@ -10,6 +13,7 @@ L2_DISTANCE_THRESHOLD = os.getenv("L2_DISTANCE_THRESHOLD", 7)
 
 MILVUS_COLLECTION = os.getenv("MILVUS_COLLECTION", "ideas")
 
+FIRESTORE_USERS_COLLECTION = os.getenv("FIRESTORE_USERS_COLLECTION", "users")
 FIRESTORE_IDEAS_COLLECTION = os.getenv("FIRESTORE_IDEAS_COLLECTION", "ideas")
 FIRESTORE_EMBEDDINGS_COLLECTION = os.getenv(
     "FIRESTORE_EMBEDDINGS_COLLECTION", "embeddings"

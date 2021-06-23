@@ -67,27 +67,31 @@ def insert_vectors(collection_name, vectors):
 
 
 def get_by_id(milvus_id):
+    if not milvus_id:
+        return [[]]
+
     try:
-        status, result_vectors = milvus_client.get_entity_by_id(
+        _, result_vectors = milvus_client.get_entity_by_id(
             MILVUS_COLLECTION, [milvus_id]
         )
 
         return result_vectors
     except Exception as e:
-        print("Milvus ERROR:", e)
         logging.error(e)
 
 
 def search_vectors(vectors):
 
+    if vectors == [[]]:
+        return {}
+
     try:
-        status, res = milvus_client.search(
+        _, res = milvus_client.search(
             collection_name=MILVUS_COLLECTION,
             query_records=vectors,
             top_k=TOP_K,
             params={"nprobe": 32},
         )
-        print(status)
 
         res_dict = {}
         for sv in res[0]:
@@ -96,7 +100,6 @@ def search_vectors(vectors):
         return res_dict
 
     except Exception as e:
-        print("Milvus ERROR:", e)
         logging.error(e)
 
 
