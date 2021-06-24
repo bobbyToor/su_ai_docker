@@ -6,8 +6,8 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 
 MILVUS_HOST = os.getenv("MILVUS_HOST", "127.0.0.1")
 MILVUS_PORT = os.getenv("MILVUS_PORT", 19530)
-VECTOR_DIMENSION = os.getenv("VECTOR_DIMENSION", 768)
-METRIC_TYPE = os.getenv("METRIC_TYPE", MetricType.L2)
+VECTOR_DIMENSION = int(os.getenv("VECTOR_DIMENSION", 768))
+METRIC_TYPE = MetricType.L2
 TOP_K = int(os.getenv("TOP_K", 7))
 L2_DISTANCE_THRESHOLD = int(os.getenv("L2_DISTANCE_THRESHOLD", 7))
 

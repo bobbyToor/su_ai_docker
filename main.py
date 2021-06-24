@@ -74,7 +74,7 @@ async def submitIdea(request: Request, valid: bool = Depends(validate_admin)):
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content=res,
+            content=str(res),
         )
     except Exception as e:
         logger.error(e)
