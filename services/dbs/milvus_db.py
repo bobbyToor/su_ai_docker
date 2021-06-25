@@ -12,15 +12,6 @@ from common.config import (
 milvus_client = Milvus(host=MILVUS_HOST, port=MILVUS_PORT)
 
 
-def init_table():
-    _, collections = milvus_client.list_collections()
-
-    if MILVUS_COLLECTION not in collections:
-        print(f"Creating collection - {MILVUS_COLLECTION}")
-        create_collection_milvus(MILVUS_COLLECTION, VECTOR_DIMENSION)
-        create_index()
-
-
 def create_collection_milvus(collection_name, dimension):
     try:
         collection_param = {
@@ -32,7 +23,6 @@ def create_collection_milvus(collection_name, dimension):
         status = milvus_client.create_collection(collection_param)
         return status
     except Exception as e:
-        print("Milvus ERROR:", e)
         logging.error(e)
 
 
@@ -44,12 +34,38 @@ def create_index():
         )
         return status
     except Exception as e:
-        print("Milvus ERROR:", e)
         logging.error(e)
 
 
+def init_table_milvus():
+    _, collections = milvus_client.list_collections()
+
+    if MILVUS_COLLECTION not in collections:
+        print(f"Creating milvus collection - {MILVUS_COLLECTION}")
+        create_collection_milvus(MILVUS_COLLECTION, VECTOR_DIMENSION)
+        create_index()
+
+
+# check if collection exists
+# if not, create it
+init_table_milvus()
+
+
+def total_count():
+    try:
+        _, result = milvus_client.count_entities(MILVUS_COLLECTION)
+        return result
+    except Exception as e:
+        logging.error(e)
+
+
+print(f"total vector count : {total_count()}")
+
+
 def insert_vectors(collection_name, vectors):
-    init_table()
+
+    # create index before every insert
+    create_index()
 
     try:
         status, ids = milvus_client.insert(
@@ -57,12 +73,24 @@ def insert_vectors(collection_name, vectors):
             records=vectors,
         )
 
-        create_index()
-        milvus_client.flush([MILVUS_COLLECTION])
+        # milvus_client.flush([MILVUS_COLLECTION])
+        # no need as of now as it does it
+        # automatically after every 1s
 
         return status, ids
     except Exception as e:
-        print("Milvus ERROR:", e)
+        logging.error(e)
+
+
+def delete_vectors(collection_name, ids):
+    if not ids:
+        return None
+
+    try:
+        status = milvus_client.delete_entity_by_id(collection_name, ids)
+
+        return status
+    except Exception as e:
         logging.error(e)
 
 

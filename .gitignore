@@ -4,3 +4,4 @@ __pycache__
 .env
 
 su_env/
+.env_local

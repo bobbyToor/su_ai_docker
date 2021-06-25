@@ -1,13 +1,10 @@
 import logging as log
-from services.dbs.firestore_db import (
-    fetch_vector_id,
-    fetch_embedding_ids,
-    fetch_ideas,
-    fetch_users,
-)
-from services.dbs.milvus_db import get_by_id, search_vectors
-from common.config import L2_DISTANCE_THRESHOLD
 
+from services.dbs.firestore_db import fetch_ideas, fetch_users
+from services.dbs.mysql_db import fetch_vector_id, fetch_embedding_ids
+from services.dbs.milvus_db import get_by_id, search_vectors
+
+from common.config import L2_DISTANCE_THRESHOLD
 
 # current strategy =
 # return all similar child ideas in a random order
@@ -51,32 +48,27 @@ def get_children_ideas(embedding_id):
 
 def get_similar_parent_ideas(embedding_id):
 
-    try:
-        vector_id = fetch_vector_id(embedding_id)
-        result_vectors = get_by_id(vector_id)  # length is always 1
+    vector_id = fetch_vector_id(embedding_id)
+    result_vectors = get_by_id(vector_id)  # length is always 1
 
-        search_vectors_res_dict = search_vectors(result_vectors)
+    search_vectors_res_dict = search_vectors(result_vectors)
 
-        sv_ids = list(search_vectors_res_dict.keys())
-        sv_ids_near = [
-            svid
-            for svid in sv_ids
-            if search_vectors_res_dict[svid] <= L2_DISTANCE_THRESHOLD
-        ]
+    sv_ids = list(search_vectors_res_dict.keys())
+    sv_ids_near = [
+        svid
+        for svid in sv_ids
+        if search_vectors_res_dict[svid] <= L2_DISTANCE_THRESHOLD
+    ]
 
-        embedding_docs_dict = fetch_embedding_ids(sv_ids_near)
+    embedding_docs_dict = fetch_embedding_ids(sv_ids_near)
 
-        similar_search_res = []
+    similar_search_res = []
 
-        for vector_id, embedding_id in embedding_docs_dict.items():
-            distance = search_vectors_res_dict[vector_id]
-            similar_search_res.append([embedding_id, distance])
+    for vector_id, embedding_id in embedding_docs_dict.items():
+        distance = search_vectors_res_dict[vector_id]
+        similar_search_res.append([embedding_id, distance])
 
-        return similar_search_res
-
-    except Exception as e:
-        log.error(e)
-        return f"Error with {e}"
+    return similar_search_res
 
 
 def get_random_children_from_parents(similar_parents):

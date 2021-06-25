@@ -22,9 +22,10 @@ app = firebase_admin.initialize_app(
 
 from firebase_admin import auth
 
-from services.insert import insert_data
+from services.idea import insert_idea, delete_idea, sync
 from services.search import get_children_ideas
-from services.dbs.milvus_db import drop_collection
+from services.dbs.milvus_db import drop_collection, init_table_milvus
+from services.dbs.mysql_db import delete_table, create_table_mysql
 
 
 app = FastAPI()
@@ -57,8 +58,8 @@ def hello():
     )
 
 
-@app.post("/submitIdea")
-async def submitIdea(request: Request, valid: bool = Depends(validate_admin)):
+@app.put("/idea")
+async def write_idea(request: Request, valid: bool = Depends(validate_admin)):
     if not valid:
         return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content="🤐")
 
@@ -70,17 +71,44 @@ async def submitIdea(request: Request, valid: bool = Depends(validate_admin)):
 
         doc_id = req_body["id"]
 
-        res = insert_data(doc_id)
+        insert_idea(doc_id)
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,
-            content=str(res),
+            content={"status": "🤩"},
         )
     except Exception as e:
         logger.error(e)
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"error": str(e)},
+        )
+
+
+@app.delete("/idea")
+async def delete_idea_request(request: Request, valid: bool = Depends(validate_admin)):
+    if not valid:
+        return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content="🤐")
+
+    try:
+        req_body = await request.json()
+
+        if "id" not in req_body:
+            raise Exception("Missing argument")
+
+        doc_id = req_body["id"]
+
+        delete_idea(doc_id)
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={"status": "🤩"},
+        )
+    except Exception as e:
+        logger.error(e)
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"error": e.to_dict()},
         )
 
 
@@ -112,13 +140,50 @@ async def getRemixed(request: Request, valid: bool = Depends(validate_user_auth)
         )
 
 
-@app.get("/dropCollection")
+@app.get("/sync")
+async def sync_dbs(valid: bool = Depends(validate_admin)):
+    if not valid:
+        return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content="🤐")
+
+    try:
+        sync()
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={"status": "🤩"},
+        )
+
+    except Exception as e:
+        logger.error(e)
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"error": str(e)},
+        )
+
+
+@app.get("/clearData")
 async def dropCollection(valid: bool = Depends(validate_admin)):
     if not valid:
         return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content="🤐")
 
-    res = drop_collection()
-    return res
+    try:
+        drop_collection()
+        delete_table()
+
+        # init_table_milvus()
+        # create_table_mysql()
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={"status": "🤩"},
+        )
+
+    except Exception as e:
+        logger.error(e)
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"error": str(e)},
+        )
 
 
 if __name__ == "__main__":
