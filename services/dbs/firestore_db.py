@@ -41,6 +41,9 @@ def fetch_ideas(idea_ids):
 
 
 def fetch_users(uids):
+    if not uids:
+        return {}
+
     uids = list(set(uids))
 
     uid_doc_refs = [

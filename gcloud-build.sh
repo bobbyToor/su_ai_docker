@@ -1,1 +1,0 @@
-gcloud builds submit . --tag=gcr.io/su-city/su-ai:1.0.0

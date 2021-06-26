@@ -9,10 +9,13 @@ from common.config import (
     TOP_K,
 )
 
-milvus_client = Milvus(host=MILVUS_HOST, port=MILVUS_PORT)
+
+def get_milvus_client():
+    milvus_client = Milvus(host=MILVUS_HOST, port=MILVUS_PORT)
+    return milvus_client
 
 
-def create_collection_milvus(collection_name, dimension):
+def create_collection_milvus(milvus_client, collection_name, dimension):
     try:
         collection_param = {
             "collection_name": collection_name,
@@ -26,7 +29,7 @@ def create_collection_milvus(collection_name, dimension):
         logging.error(e)
 
 
-def create_index():
+def create_index(milvus_client):
     param = {"nlist": 16384}
     try:
         status = milvus_client.create_index(
@@ -37,21 +40,16 @@ def create_index():
         logging.error(e)
 
 
-def init_table_milvus():
+def init_table_milvus(milvus_client):
     _, collections = milvus_client.list_collections()
 
     if MILVUS_COLLECTION not in collections:
         print(f"Creating milvus collection - {MILVUS_COLLECTION}")
-        create_collection_milvus(MILVUS_COLLECTION, VECTOR_DIMENSION)
-        create_index()
+        create_collection_milvus(milvus_client, MILVUS_COLLECTION, VECTOR_DIMENSION)
+        create_index(milvus_client)
 
 
-# check if collection exists
-# if not, create it
-init_table_milvus()
-
-
-def total_count():
+def total_count(milvus_client):
     try:
         _, result = milvus_client.count_entities(MILVUS_COLLECTION)
         return result
@@ -59,13 +57,10 @@ def total_count():
         logging.error(e)
 
 
-print(f"total vector count : {total_count()}")
-
-
-def insert_vectors(collection_name, vectors):
+def insert_vectors(milvus_client, collection_name, vectors):
 
     # create index before every insert
-    create_index()
+    create_index(milvus_client)
 
     try:
         status, ids = milvus_client.insert(
@@ -82,7 +77,7 @@ def insert_vectors(collection_name, vectors):
         logging.error(e)
 
 
-def delete_vectors(collection_name, ids):
+def delete_vectors(milvus_client, collection_name, ids):
     if not ids:
         return None
 
@@ -94,7 +89,7 @@ def delete_vectors(collection_name, ids):
         logging.error(e)
 
 
-def get_by_id(milvus_id):
+def get_by_id(milvus_client, milvus_id):
     if not milvus_id:
         return [[]]
 
@@ -108,7 +103,7 @@ def get_by_id(milvus_id):
         logging.error(e)
 
 
-def search_vectors(vectors):
+def search_vectors(milvus_client, vectors):
 
     if vectors == [[]]:
         return {}
@@ -131,7 +126,7 @@ def search_vectors(vectors):
         logging.error(e)
 
 
-def drop_collection():
+def drop_collection(milvus_client):
     status = milvus_client.drop_collection(MILVUS_COLLECTION)
     milvus_client.flush([MILVUS_COLLECTION])
     return status

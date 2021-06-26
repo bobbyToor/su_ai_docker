@@ -1,21 +1,20 @@
-import logging as log
+import logging as logger
+
+from sqlalchemy.orm import Session
+from milvus import Milvus
 
 from services.dbs.firestore_db import fetch_ideas, fetch_users
-from services.dbs.mysql_db import fetch_vector_id, fetch_embedding_ids
+
+from services.dbs.sql_crud import *
 from services.dbs.milvus_db import get_by_id, search_vectors
 
 from common.config import L2_DISTANCE_THRESHOLD
 
 # current strategy =
 # return all similar child ideas in a random order
-def get_children_ideas(embedding_id):
+def get_children_ideas(db: Session, vdb: Milvus, embedding_id: str):
 
-    similar_parents = get_similar_parent_ideas(embedding_id)
-    # similar_parents =
-    # [['C2Px9cRW5vbmD7mZ9ArX_0', 4.018357276916504],
-    # ['KpEiykeXiDwQoB3gCEBW_0', 0.0],
-    # ['KywCb8RqySJkUoxjulOu_0', 1.4454364776611328],
-    # ['PjKOLexLCGtxOqTeXzGh_0_1', 3.6773252487182617]]
+    similar_parents = get_similar_parent_ideas(db, vdb, embedding_id)
 
     random_children = get_random_children_from_parents(similar_parents)
 
@@ -46,12 +45,20 @@ def get_children_ideas(embedding_id):
     return child_ideas_processed
 
 
-def get_similar_parent_ideas(embedding_id):
+# similar_parents =
+# [['C2Px9cRW5vbmD7mZ9ArX_0', 4.018357276916504],
+# ['KpEiykeXiDwQoB3gCEBW_0', 0.0],
+# ['KywCb8RqySJkUoxjulOu_0', 1.4454364776611328],
+# ['PjKOLexLCGtxOqTeXzGh_0_1', 3.6773252487182617]]
+def get_similar_parent_ideas(db: Session, vdb: Milvus, embedding_id: str):
 
-    vector_id = fetch_vector_id(embedding_id)
-    result_vectors = get_by_id(vector_id)  # length is always 1
+    vector_id = fetch_vector_id(db, embedding_id)
+    if not vector_id:
+        return []
 
-    search_vectors_res_dict = search_vectors(result_vectors)
+    result_vectors = get_by_id(vdb, vector_id)  # length is always 1
+
+    search_vectors_res_dict = search_vectors(vdb, result_vectors)
 
     sv_ids = list(search_vectors_res_dict.keys())
     sv_ids_near = [
@@ -60,7 +67,11 @@ def get_similar_parent_ideas(embedding_id):
         if search_vectors_res_dict[svid] <= L2_DISTANCE_THRESHOLD
     ]
 
-    embedding_docs_dict = fetch_embedding_ids(sv_ids_near)
+    embedding_docs_dict = {}
+    embeddings = fetch_embedding_ids(db, sv_ids_near)
+
+    for embedding in embeddings:
+        embedding_docs_dict[embedding.vector_id] = embedding.embedding_id
 
     similar_search_res = []
 
@@ -72,6 +83,8 @@ def get_similar_parent_ideas(embedding_id):
 
 
 def get_random_children_from_parents(similar_parents):
+    if not similar_parents:
+        return []
 
     embedding_ids = [item[0] for item in similar_parents]
 

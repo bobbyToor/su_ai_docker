@@ -5,3 +5,4 @@ __pycache__
 
 su_env/
 .env_local
+commands.txt
