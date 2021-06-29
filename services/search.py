@@ -1,4 +1,5 @@
 import logging as logger
+import random
 
 from sqlalchemy.orm import Session
 from milvus import Milvus
@@ -17,6 +18,10 @@ def get_children_ideas(db: Session, vdb: Milvus, embedding_id: str):
     similar_parents = get_similar_parent_ideas(db, vdb, embedding_id)
 
     random_children = get_random_children_from_parents(similar_parents)
+
+    # hacky ranking
+    random.shuffle(random_children)
+    random_children = random_children[:7]
 
     uids = [cid["uid"] for cid in random_children]
 
