@@ -1,15 +1,13 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, status, Request
 from fastapi.responses import JSONResponse
 from fastapi.params import Depends
 
 router = APIRouter()
 
-from sqlalchemy.orm import Session
 
 from dependencies import *
-from milvus import Milvus
 
-from db_manager import delete_embeddings_table, create_embeddings_table, get_vdb
+from services.idea.sync import sync
 
 from services.dbs.milvus_db import drop_collection, init_table_milvus
 
@@ -22,20 +20,50 @@ def hello():
     )
 
 
-@router.get("/clearData")
-async def dropCollection(
+@router.get("/sync")
+async def sync_dbs(
+    request: Request,
     auth_valid: bool = Depends(validate_admin),
-    vdb: Milvus = Depends(get_vdb),
 ):
     if not auth_valid:
         return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content="🤐")
 
     try:
+        dbm = request.state.dbm
+
+        sync(dbm)
+
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={"status": "🤩"},
+        )
+
+    except Exception as e:
+        logger.error(e)
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"error": str(e)},
+        )
+
+
+@router.get("/clearData")
+async def dropCollection(
+    request: Request,
+    auth_valid: bool = Depends(validate_admin),
+):
+    if not auth_valid:
+        return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content="🤐")
+
+    try:
+
+        dbm = request.state.dbm
+        vdb = dbm.get_vdb()
+
         drop_collection(vdb)
-        delete_embeddings_table()
+        dbm.delete_db_tables()
 
         init_table_milvus(vdb)
-        create_embeddings_table()
+        dbm.create_db_tables()
 
         return JSONResponse(
             status_code=status.HTTP_200_OK,

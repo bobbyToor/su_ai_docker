@@ -1,71 +1,59 @@
+from db_manager import DbManager
 import logging as logger
 
 from sqlalchemy.orm import Session
 
-
 from services.dbs.milvus_db import *
 from services.dbs.sql_crud import *
+from services.idea.insert import get_idea_models_from_ideas_list
 from models import *
-from db_manager import delete_embeddings_table, create_embeddings_table
 
 from services.dbs.firestore_db import fetch_all_ideas
-from services.embedder import get_title_embeddings
+from services.embedder import get_idea_data_list
 from common.config import MILVUS_COLLECTION
 
-
-def sync(db: Session, vdb: Milvus):
+# should do in batch
+# currently can cause RAM issues
+def sync(dbm: DbManager):
     logger.info(f"Syncing now ....")
+
+    db = dbm.get_db()
+    vdb = dbm.get_vdb()
 
     drop_collection(vdb)
     logger.info(f"Dropped milvus collection")
-    delete_embeddings_table()
-    logger.info(f"Dropped mysql table")
+
+    dbm.delete_db_tables()
+    logger.info(f"Dropped mysql tables")
 
     init_table_milvus(vdb)
-    create_embeddings_table()
+    dbm.create_db_tables()
 
     vectors = []
-    data_dict = {}
-
-    tuple_list = []
+    ideas_data_list = []
 
     docs_dict = fetch_all_ideas()
 
-    for doc_id, doc_data in docs_dict.items():
-        data_dict[doc_id] = {}
-        title_embeddings = get_title_embeddings(doc_id, doc_data)
+    for idea_id, doc_data in docs_dict.items():
 
-        doc_embeddings = list(title_embeddings.keys())
+        idea_data_list = get_idea_data_list(idea_id, doc_data)
+        ideas_data_list += idea_data_list
 
-        doc_vectors = [v.tolist() for v in list(title_embeddings.values())]
+        doc_vectors = [v["title_vector"].tolist() for v in idea_data_list]
         vectors += doc_vectors
-
-        for index, doc_embedding in enumerate(doc_embeddings):
-            tuple_list.append((doc_id, doc_vectors[index], doc_embedding))
 
     docs_dict.clear()
 
     # create vector ids
     status, vector_ids = insert_vectors(vdb, MILVUS_COLLECTION, vectors)
-    logger.info(f"insert_vectors status : {status}")
+    if len(vector_ids) != len(vectors):
+        logger.error("Error insert vector, lengths not equal")
+    logger.info(f"insert_vectors status, sync : {status}")
 
-    embeddings = []
+    idea_list = get_idea_models_from_ideas_list(ideas_data_list, vector_ids)
 
-    for index, vid in enumerate(vector_ids):
-        vector = vectors[index]
-
-        for (doc_id, doc_vector, doc_embedding) in tuple_list:
-            if vector == doc_vector:
-
-                embedding = Embedding()
-                embedding.vector_id = vid
-                embedding.embedding_id = doc_embedding
-                embedding.idea_id = doc_id
-
-                embeddings.append(embedding)
-
-    tuple_list.clear()
+    ideas_data_list.clear()
 
     # inserts vector ids into mysql
-    insert_embeddings(db, embeddings)
-    logger.info(f"total embeddings inserted : {len(embeddings)}")
+    insert_embedded_ideas(db, idea_list)
+    logger.info(f"total embeddings inserted : {len(idea_list)}")

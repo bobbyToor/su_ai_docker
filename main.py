@@ -1,7 +1,7 @@
 import uvicorn
 import logging as logger
 
-logger.basicConfig(level=logger.INFO)
+# logger.basicConfig(level=logger.INFO)
 
 from dotenv import load_dotenv
 
@@ -12,9 +12,19 @@ import firebase_admin
 credentials = firebase_admin.credentials.Certificate("./common/service_account.json")
 firebase_admin.initialize_app(credentials)
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from db_manager import DbManager
 
 fastapp = FastAPI()
+
+dbm = DbManager()
+
+
+@fastapp.middleware("http")
+async def db_session_middleware(request: Request, call_next):
+    request.state.dbm = dbm
+    response = await call_next(request)
+    return response
 
 
 @fastapp.on_event("startup")

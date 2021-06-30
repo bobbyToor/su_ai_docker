@@ -1,35 +1,42 @@
 from typing import List
 from sqlalchemy.orm import Session
-from models import *
+from sqlalchemy.sql.expression import or_
+from models import Idea
 
 
-def fetch_vector_id(db: Session, embedding_id: str):
-    embedding = (
-        db.query(Embedding).filter(Embedding.embedding_id == embedding_id).first()
-    )
-
-    if embedding:
-        return embedding.vector_id
-    return None
+def fetch_by_id(db: Session, idea_id: str):
+    idea = db.query(Idea).filter(Idea.id == idea_id).first()
+    return idea
 
 
-def fetch_embedding_ids(db: Session, vector_ids: List[str]):
-    embeddings = db.query(Embedding).filter(Embedding.vector_id.in_(vector_ids)).all()
-    return embeddings
+def fetch_by_idea_path(db: Session, idea_path: str):
+    idea = db.query(Idea).filter(Idea.path == idea_path).first()
+    return idea
 
 
-def insert_embeddings(db: Session, embeddings: List[Embedding]):
-    db.bulk_save_objects(embeddings)
+def fetch_by_vector_ids(db: Session, vector_ids: List[str]):
+    ideas = db.query(Idea).filter(Idea.vector_id.in_(vector_ids)).all()
+    return ideas
+
+
+def search_by_paths(db: Session, path_regexs: List[str]):
+    filters = [Idea.path.op("regexp")(p) for p in path_regexs]
+    ideas = db.query(Idea).filter(or_(*filters)).all()
+    return ideas
+
+
+def insert_embedded_ideas(db: Session, embedded_ideas: List[Idea]):
+    db.bulk_save_objects(embedded_ideas)
     db.commit()
 
 
-def delete_embeddings_by_idea_id(db: Session, idea_id: str):
-    db.query(Embedding).filter(Embedding.idea_id == idea_id).delete(
-        synchronize_session=False
+def mark_delete_ideas_by_fid(db: Session, fid: str):
+    db.query(Idea).filter(Idea.fid == fid).update(
+        {"deleted": True}, synchronize_session=False
     )
     db.commit()
 
 
-def get_embeddings_by_idea_id(db: Session, idea_id: str):
-    embeddings = db.query(Embedding).filter(Embedding.idea_id == idea_id).all()
-    return embeddings
+def get_ideas(db: Session, fid: str):
+    ideas = db.query(Idea).filter(Idea.fid == fid).all()
+    return ideas

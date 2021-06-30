@@ -13,34 +13,44 @@ from common.config import L2_DISTANCE_THRESHOLD
 
 # current strategy =
 # return all similar child ideas in a random order
-def get_children_ideas(db: Session, vdb: Milvus, embedding_id: str):
+def get_children_ideas(db: Session, vdb: Milvus, idea_id: str):
 
-    similar_parents = get_similar_parent_ideas(db, vdb, embedding_id)
+    current_idea = fetch_by_id(db, idea_id)
+    if not current_idea:
+        logger.warning(f"Unknown id received : {idea_id}")
+        return []
 
-    random_children = get_random_children_from_parents(similar_parents)
+    current_children = get_1st_children(db, [current_idea])
+
+    similar_parents = get_similar_parent_ideas(db, vdb, idea_id)
+    similar_parents_children = get_1st_children(db, similar_parents)
 
     # hacky ranking
-    random.shuffle(random_children)
-    random_children = random_children[:7]
+    total_children = current_children + similar_parents_children
+    total_children = list(set(total_children))
+    random.shuffle(total_children)
+    random_children = total_children[:7]
 
-    uids = [cid["uid"] for cid in random_children]
+    uids = [cid.uid for cid in random_children]
 
+    # create user table in mysql too
+    # dont fetch from firestore
     users_dict = fetch_users(uids)
 
     child_ideas_processed = []
 
     for child_idea in random_children:
-        uid = child_idea["uid"]
+        uid = child_idea.uid
         user = users_dict[uid]
 
         child_idea_processed = {
-            "id": child_idea["id"],
-            "path": child_idea["path"],
-            "title": child_idea["title"],
-            "description": child_idea["description"],
-            "emoji": child_idea["emoji"],
-            "children": child_idea["children"],
-            "uid": child_idea["uid"],
+            "id": child_idea.id,
+            "uid": uid,
+            "path": child_idea.path,
+            "title": child_idea.title,
+            "description": child_idea.description,
+            "emoji": child_idea.emoji,
+            "children": [],
             "userPhotoUrl": user["photoUrl"],
             "userHandle": user["handle"],
         }
@@ -50,21 +60,19 @@ def get_children_ideas(db: Session, vdb: Milvus, embedding_id: str):
     return child_ideas_processed
 
 
-# similar_parents =
-# [['C2Px9cRW5vbmD7mZ9ArX_0', 4.018357276916504],
-# ['KpEiykeXiDwQoB3gCEBW_0', 0.0],
-# ['KywCb8RqySJkUoxjulOu_0', 1.4454364776611328],
-# ['PjKOLexLCGtxOqTeXzGh_0_1', 3.6773252487182617]]
-def get_similar_parent_ideas(db: Session, vdb: Milvus, embedding_id: str):
+def get_similar_parent_ideas(db: Session, vdb: Milvus, idea_id: str):
 
-    vector_id = fetch_vector_id(db, embedding_id)
-    if not vector_id:
+    idea = fetch_by_id(db, idea_id)
+    if not idea:
         return []
+
+    vector_id = idea.vector_id
 
     result_vectors = get_by_id(vdb, vector_id)  # length is always 1
 
     search_vectors_res_dict = search_vectors(vdb, result_vectors)
 
+    # get ideas whose distance is less than threshold
     sv_ids = list(search_vectors_res_dict.keys())
     sv_ids_near = [
         svid
@@ -72,60 +80,19 @@ def get_similar_parent_ideas(db: Session, vdb: Milvus, embedding_id: str):
         if search_vectors_res_dict[svid] <= L2_DISTANCE_THRESHOLD
     ]
 
-    embedding_docs_dict = {}
-    embeddings = fetch_embedding_ids(db, sv_ids_near)
-
-    for embedding in embeddings:
-        embedding_docs_dict[embedding.vector_id] = embedding.embedding_id
-
-    similar_search_res = []
-
-    for vector_id, embedding_id in embedding_docs_dict.items():
-        distance = search_vectors_res_dict[vector_id]
-        similar_search_res.append([embedding_id, distance])
-
-    return similar_search_res
+    near_parent_ideas = fetch_by_vector_ids(db, sv_ids_near)
+    return near_parent_ideas
 
 
-def get_random_children_from_parents(similar_parents):
-    if not similar_parents:
+def get_1st_children(db: Session, parents: List[Idea]):
+    if not parents:
         return []
 
-    embedding_ids = [item[0] for item in similar_parents]
+    path_queries = []
 
-    parent_doc_ids = []
-    for embedding_id in embedding_ids:
-        parts = embedding_id.split("_")
-        parent_doc_ids.append(parts[0])
+    for idea in parents:
+        path = idea.path
+        path_queries.append(f"{path},[^,]*$")
 
-    parent_doc_ids = list(set(parent_doc_ids))
-
-    root_ideas_dict = fetch_ideas(parent_doc_ids)
-
-    child_ideas = []
-
-    for item in similar_parents:
-        embedding_id = item[0]
-        parts = embedding_id.split("_")
-
-        doc_id = parts[0]
-        child_path = [int(path_id) for path_id in parts[1:]]
-
-        curr = root_ideas_dict[doc_id]
-        curr_children = []
-
-        if child_path == [0]:
-            curr_children += curr["children"]
-        else:
-            for path_id in child_path[1:]:
-                children = curr["children"]
-                curr = children[path_id]
-
-            curr_children += curr["children"]
-
-        for child in curr_children:
-            child["id"] = doc_id
-
-        child_ideas += curr_children
-
-    return child_ideas
+    children = search_by_paths(db, path_queries)
+    return children
