@@ -1,0 +1,8 @@
+core/service_account.json
+
+__pycache__
+.env
+
+suvenv/
+commands.txt
+secret_env
